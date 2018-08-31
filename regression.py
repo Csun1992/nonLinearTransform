@@ -3,11 +3,18 @@ import sys
 from perceptron import * 
 
 class Regression(Perceptron):
-    def __init__(self, data, group):
+    def __init__(self, data, group, testData, testGroup, regParam):
         super(Regression, self).__init__(data, group)
+        self.dataDim = np.size(data, 0)
+        self.testSize = np.size(testData, 0)
+        self.testData = np.concatenate((np.ones((self.testSize, 1)), testData), axis=1)
+        self.testGroup = testGroup
+        self.classifiedTest = []
+        self.regParam = regParam
 
     def findLinCoeff(self):
-        pseudoInv = np.linalg.inv(self.data.T.dot(self.data)).dot(self.data.T)
+        eye = np.diag(np.ones((self.dataDim, 1)))
+        pseudoInv = np.linalg.inv(self.data.T.dot(self.data)+self.regParam*eye).dot(self.data.T)
         correctGroup = np.array(self.correctGroup).reshape(-1, 1)
         self.linCoeff = pseudoInv.dot(correctGroup)
         return self.linCoeff
@@ -40,72 +47,15 @@ class Regression(Perceptron):
     
     def getLinCoeff(self):
         return self.linCoeff
-    
+   
+    def classifyTest(self):
+        for i in range(self.testSize):
+            self.classifiedTest.append(sign(self.linCoeff.T.dot(self.testData[i, :])))
+        return self.classifiedTest
 
-if __name__ == "__main__":
-    """
-    experimentNum = 1000
-    dataDim = 2
-    lowerLim = -1
-    upperLim = 1
-
-    # experiment with sample size = 100
-    sampleSize = 100
-    inSampleErrs = []
-
-    for i in range(experimentNum):
-        data = np.random.uniform(lowerLim, upperLim, sampleSize*dataDim).reshape(sampleSize, dataDim)
-        x1 = data[0, :]
-        x2 = data[1, :]
-        slope, intercept = findLine(x1, x2)
-        group = classify(data, slope, intercept)
-
-        regression = Regression(data, group)
-        inSampleErrs.append(regression.run())
-    print "For sample size = 100, the average in sample error is:"
-    print sum(inSampleErrs)/experimentNum
-
-    # estimate out-of-sample error
-    hatMatrix = regression.getHatMatrix()
-    data = np.random.uniform(lowerLim, upperLim, sampleSize*dataDim).reshape(sampleSize, dataDim)
-    group = np.array(classify(data, slope, intercept)).reshape(-1, 1)
-    predictedVals = hatMatrix.dot(group) 
-    learnedGroup = [sign(predictedVals[i]) for i in range(sampleSize)]
-    outSampleErr = sum([learnedGroup[i]!=group[i] for i in range(sampleSize)]) / float(sampleSize)
-
-    print "out of sample error is:"
-    print outSampleErr
-    """ 
-
-    # second experiment with regression result as initial value for perceptron
-    experimentNum = 1000
-    dataDim = 2
-    lowerLim = -1
-    upperLim = 1
-
-    # experiment with sample size = 100
-    sampleSize = 10
-    iteration = 0
-    for i in range(experimentNum):
-        data = np.random.uniform(lowerLim, upperLim, sampleSize*dataDim).reshape(sampleSize, dataDim)
-        x1 = data[0, :]
-        x2 = data[1, :]
-        slope, intercept = findLine(x1, x2)
-        group = classify(data, slope, intercept)
-        print slope, intercept
-
-        regression = Regression(data, group)
-        regression.run()
-        initCoeff = regression.getLinCoeff()
-        print initCoeff
-        sys.exit()
-        perceptron = Perceptron(data, group)
-        perceptron.setCoeff(initCoeff)
-        perceptron.setMisclassified(regression.getMisclassifiedIndex())
-        perceptron.learn()
-        iteration += perceptron.getRepetition()
-        
-    print iteration/float(experimentNum) 
-
-
-    
+    def getOutSampleErr(self):
+        self.classifyTest()
+        err = 0
+        for (i, j) in zip(self.classifiedTest, self.testGroup):
+            err += (i!=j)
+        return float(err)/self.testSize
